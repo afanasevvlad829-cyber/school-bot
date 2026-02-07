@@ -143,8 +143,38 @@ h1{font-size:22px; margin:0 0 6px}
   font-weight:800;
 }
 
-/* highlighted row */
+/* ===== Highlight current type with LIGHT GRADIENT ===== */
 .statLine.youHere{
   border-color:#16a34a;
-  box-shadow:0 0 0 2px rgba(22,163,74,.18);
+  /* мягкий светлый градиент */
+  background:
+    linear-gradient(90deg, rgba(232, 255, 243, 0.95), rgba(245, 247, 251, 0.95));
+  color:#0b0c10;
+
+  /* “дорогая” подсветка */
+  box-shadow:
+    0 0 0 2px rgba(22,163,74,.18),
+    0 10px 30px rgba(22,163,74,.10);
+}
+
+/* приводим текст к темному, чтобы читалось */
+.statLine.youHere .statName,
+.statLine.youHere .statPct,
+.statLine.youHere .statCount{
+  color:#0b0c10;
+}
+
+/* слегка “осветлим” подписи справа */
+.statCount{font-size:11px; opacity:.75}
+.statLine.youHere .statCount{opacity:.7}
+
+/* аватар на светлом фоне выглядит лучше с более светлой рамкой */
+.statLine.youHere .avatar{
+  border-color:#d7deea;
+  background:#ffffff;
+}
+
+/* hover у выделенного типа — чуть ярче */
+.statLine.youHere:hover{
+  filter:brightness(1.02);
 }
