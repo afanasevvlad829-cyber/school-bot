@@ -2,7 +2,6 @@
   const tg = window.Telegram?.WebApp;
   const C = window.APP_CONFIG;
 
-  // ===== UI refs =====
   const screens = {
     start: document.getElementById("screen-start"),
     quiz: document.getElementById("screen-quiz"),
@@ -36,7 +35,6 @@
   const ctaBtn = document.getElementById("ctaBtn");
   const codimsBtn = document.getElementById("codimsBtn");
 
-  // stats modal refs
   const statsBtn = document.getElementById("statsBtn");
   const statsModal = document.getElementById("statsModal");
   const statsCloseBg = document.getElementById("statsCloseBg");
@@ -47,7 +45,6 @@
   const statsMeta = document.getElementById("statsMeta");
   const statsBody = document.getElementById("statsBody");
 
-  // ===== errors =====
   function logErr(msg){
     if (!errBox) return;
     errBox.textContent += (errBox.textContent ? "\n" : "") + msg;
@@ -55,7 +52,6 @@
   window.onerror = (m, src, line, col) => logErr(`JS error: ${m} @${line}:${col}`);
   window.onunhandledrejection = (e) => logErr("Promise error: " + (e.reason?.message || e.reason || "unknown"));
 
-  // ===== telegram init =====
   try {
     if (tg) {
       tg.expand();
@@ -82,12 +78,10 @@
     };
   }
 
-  // ===== session id =====
   function uid(){
     return (crypto?.randomUUID?.() || ("s_" + Math.random().toString(16).slice(2) + Date.now()));
   }
 
-  // ===== 1-row stats buffer =====
   let sessionId = uid();
   let stats = null;
 
@@ -116,11 +110,7 @@
 
   async function sendSessionRow(reason){
     try{
-      const payload = {
-        ...stats,
-        ...getTgUser(),
-        reason: reason || "unknown"
-      };
+      const payload = { ...stats, ...getTgUser(), reason: reason || "unknown" };
 
       const res = await fetch(C.STATS_URL, {
         method: "POST",
@@ -163,7 +153,6 @@
     tick();
   }
 
-  // ===== UTM builder =====
   function withUtm(baseUrl, content){
     const u = new URL(baseUrl);
     const utm = C.UTM;
@@ -177,7 +166,6 @@
     return u.toString();
   }
 
-  // ===== state =====
   let toxicMode = false;
   let usedAccuracy = false;
 
@@ -190,7 +178,6 @@
     screens[screen].style.display = "block";
   }
 
-  // ✅ FIX: safe scoring (если opt.s отсутствует)
   function addScore(map){
     map = map || {};
     for (const [k,v] of Object.entries(map)) {
@@ -198,7 +185,6 @@
     }
   }
 
-  // ===== toxic toggle =====
   function setToxic(on){
     toxicMode = !!on;
     stats.toxic = toxicMode;
@@ -215,11 +201,9 @@
       toxicExplain.textContent = "OFF — мягко. ON — жёстко: сарказм и правда без сюсюканья.";
     }
   }
-
   toxicSwitch.addEventListener("click", () => setToxic(!toxicMode));
   setToxic(false);
 
-  // ===== scoring helpers =====
   function top2Types(){
     const entries = window.TYPES.map(t => [t.id, score[t.id] || 0]);
     entries.sort((a,b)=>b[1]-a[1]);
@@ -279,43 +263,39 @@ ${best.meme}
     `;
   }
 
-  // ===== quiz render =====
+  function pluralClick(n){
+    if (n === 1) return "клик";
+    if (n >= 2 && n <= 4) return "клика";
+    return "кликов";
+  }
+
   function renderQuestion(){
     try {
       const q = questions[idx];
       const total = questions.length;
 
-      if (!q) {
-        logErr(`renderQuestion: нет вопроса idx=${idx}, total=${total}`);
-        // запасной выход
-        renderResult();
-        return;
-      }
+      if (!q) { renderResult(); return; }
 
       progressPill.textContent = `Вопрос ${idx+1}/${total}`;
-      microPill.textContent = `ещё ${Math.max(0,total-(idx+1))} клика до диагноза`;
-      qText.textContent = q.q || "(пустой вопрос)";
 
+      const left = Math.max(0, total - (idx + 1));
+      microPill.textContent = left === 0
+        ? `диагноз готов 😈`
+        : `ещё ${left} ${pluralClick(left)} до диагноза`;
+
+      qText.textContent = q.q || "(пустой вопрос)";
       answersEl.innerHTML = "";
 
       const answers = Array.isArray(q.a) ? q.a : [];
-      if (answers.length === 0) {
-        logErr(`renderQuestion: у вопроса idx=${idx} нет вариантов ответов`);
-      }
-
       answers.forEach((opt, optIndex) => {
         const b = document.createElement("button");
         b.className = "btn";
         b.textContent = opt?.t || `(вариант ${optIndex+1})`;
 
-        // ✅ FIX: try/catch на клике, чтобы не “молчало”
         b.onclick = () => {
           try {
             stats.answers.push({ q_index: idx, option: opt?.t || "", ts: Date.now() });
-
-            // ✅ FIX: opt.s может быть undefined
             addScore(opt?.s || {});
-
             idx++;
 
             if (!usedAccuracy && idx === window.QUESTIONS.BASE.length) {
@@ -395,7 +375,6 @@ ${best.meme}
     }
   }
 
-  // ===== buttons =====
   startBtn.onclick = () => {
     resetStats();
     stats.open_ts = stats.open_ts || new Date().toISOString();
@@ -460,7 +439,7 @@ ${best.meme}
     sendSessionRow("cta_aidacamp");
   };
 
-  // ===== Global stats =====
+  // ===== Global stats (как у тебя было) =====
   function openStatsModal(){ statsModal.style.display = "block"; }
   function closeStatsModal(){ statsModal.style.display = "none"; }
 
@@ -611,7 +590,6 @@ ${best.meme}
     else showGlobalStats();
   };
 
-  // ===== init hints =====
   const u = getTgUser();
   userHint.textContent = u.username
     ? `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""} (${u.username})`.trim()
