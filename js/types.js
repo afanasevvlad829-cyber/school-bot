@@ -401,4 +401,12 @@ window.TYPES = [
         font-family="system-ui,Apple Color Emoji,Segoe UI Emoji">${emoji}</text>
   <text x="32" y="54" text-anchor="middle" font-size="9.5" letter-spacing="1"
         font-family="system-ui,Segoe UI,Roboto,Arial" fill="rgba(255,255,255,.78)">${label}</text>
-</sv
+</svg>`;
+  }
+
+  window.TYPE_SVG = {};
+  window.TYPES.forEach(t => {
+    const c = pickAccent(t.id);
+    window.TYPE_SVG[t.id] = svgCoin(t.label, t.emoji, c.accent, c.deep);
+  });
+})();
