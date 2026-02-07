@@ -17,9 +17,11 @@
   const webappHint = document.getElementById("webappHint");
   const errBox = document.getElementById("errBox");
 
-  const toxicSwitch = document.getElementById("toxicSwitch");
-  const toxicLabel = document.getElementById("toxicLabel");
-  const toxicExplain = document.getElementById("toxicExplain");
+  // mode ui
+  const modeExplain = document.getElementById("modeExplain");
+  const modeMemeBtn = document.getElementById("modeMeme");
+  const modeToxicBtn = document.getElementById("modeToxic");
+  const modeEvilBtn = document.getElementById("modeEvil");
 
   const startBtn = document.getElementById("startBtn");
   const accuracyBtn = document.getElementById("accuracyBtn");
@@ -93,7 +95,7 @@
       open_ts: null,
       start_ts: null,
       finish_ts: null,
-      toxic: false,
+      mode: "meme", // meme|toxic|evil
       accuracy: false,
       result: null,
       answers: [],
@@ -166,13 +168,41 @@
     return u.toString();
   }
 
-  let toxicMode = false;
-  let usedAccuracy = false;
+  // ===== MODE =====
+  let mode = "meme"; // meme|toxic|evil
+  function setMode(next){
+    mode = next;
+    stats.mode = mode;
 
+    const all = [modeMemeBtn, modeToxicBtn, modeEvilBtn];
+    all.forEach(b => b.classList.remove("isActive"));
+    all.forEach(b => b.setAttribute("aria-selected","false"));
+
+    if (mode === "meme") {
+      modeMemeBtn.classList.add("isActive");
+      modeMemeBtn.setAttribute("aria-selected","true");
+      modeExplain.textContent = "Мемно — узнаваемо и смешно. Можно кидать всем.";
+    } else if (mode === "toxic") {
+      modeToxicBtn.classList.add("isActive");
+      modeToxicBtn.setAttribute("aria-selected","true");
+      modeExplain.textContent = "Токсично — язвительно и колко. Без мата, но с правдой.";
+    } else {
+      modeEvilBtn.classList.add("isActive");
+      modeEvilBtn.setAttribute("aria-selected","true");
+      modeExplain.textContent = "Злобно — максимально жёстко. Если ты в ресурсе и тебе можно 😈";
+    }
+  }
+  modeMemeBtn.onclick = () => setMode("meme");
+  modeToxicBtn.onclick = () => setMode("toxic");
+  modeEvilBtn.onclick = () => setMode("evil");
+  setMode("meme");
+
+  // ===== state =====
+  let usedAccuracy = false;
   let idx = 0;
   let score = {};
   let questions = [];
-  let baseLen = 0; // ✅ база зависит от режима
+  let baseLen = 0;
 
   function show(screen){
     Object.values(screens).forEach(s => s.style.display = "none");
@@ -185,25 +215,6 @@
       score[k] = (score[k] || 0) + (Number(v) || 0);
     }
   }
-
-  function setToxic(on){
-    toxicMode = !!on;
-    stats.toxic = toxicMode;
-
-    if (toxicMode) {
-      toxicSwitch.classList.add("on");
-      toxicSwitch.setAttribute("aria-checked","true");
-      toxicLabel.textContent = "Режим токсик: ON";
-      toxicExplain.textContent = "ON — максимально жёстко и язвительно (без мата). OFF — мягко.";
-    } else {
-      toxicSwitch.classList.remove("on");
-      toxicSwitch.setAttribute("aria-checked","false");
-      toxicLabel.textContent = "Режим токсик: OFF";
-      toxicExplain.textContent = "OFF — мягко. ON — жёстко: сарказм и правда без сюсюканья.";
-    }
-  }
-  toxicSwitch.addEventListener("click", () => setToxic(!toxicMode));
-  setToxic(false);
 
   function top2Types(){
     const entries = window.TYPES.map(t => [t.id, score[t.id] || 0]);
@@ -229,7 +240,7 @@ ${best.meme}
   }
 
   function renderTypeDescriptionHTML(typeObj){
-    const d = toxicMode ? typeObj.toxic : typeObj.soft;
+    const d = (mode === "meme") ? typeObj.soft : (mode === "toxic" ? typeObj.toxic : typeObj.evil);
     const bullets = (d.bullets || []).map(x => `<li style="margin:6px 0">${x}</li>`).join("");
     const refs = (typeObj.refs || []).map(r => `<li style="margin:6px 0">${r}</li>`).join("");
 
@@ -299,7 +310,6 @@ ${best.meme}
             addScore(opt?.s || {});
             idx++;
 
-            // ✅ показываем экран точности ровно после базовых 5 вопросов
             if (!usedAccuracy && idx === baseLen) {
               show("accuracy");
               return;
@@ -319,6 +329,17 @@ ${best.meme}
     }
   }
 
+  function pickBaseQuestions(){
+    if (mode === "meme") return window.QUESTIONS.MEME_BASE;
+    if (mode === "toxic") return window.QUESTIONS.TOXIC_BASE;
+    return window.QUESTIONS.EVIL_BASE;
+  }
+  function pickAccuracyQuestions(){
+    if (mode === "meme") return window.QUESTIONS.MEME_ACCURACY;
+    if (mode === "toxic") return window.QUESTIONS.TOXIC_ACCURACY;
+    return window.QUESTIONS.EVIL_ACCURACY;
+  }
+
   function renderResult(){
     try{
       const { t1, t2 } = top2Types();
@@ -330,7 +351,8 @@ ${best.meme}
       stats.finish_ts = new Date().toISOString();
 
       rTitle.textContent = `Ты — ${best.name}`;
-      rSubtitle.textContent = (toxicMode ? `Режим токсик: ON • ${best.meme}` : best.meme) + (usedAccuracy ? " • точность включена" : "");
+      const modeLabel = (mode==="meme" ? "Мемно" : (mode==="toxic" ? "Токсично" : "Злобно"));
+      rSubtitle.textContent = `${modeLabel} • ${best.meme}` + (usedAccuracy ? " • точность включена" : "");
 
       const html = renderTypeDescriptionHTML(best);
 
@@ -377,14 +399,6 @@ ${best.meme}
     }
   }
 
-  // ✅ выбираем набор вопросов на старте по токсик-режиму
-  function pickBaseQuestions(){
-    return toxicMode ? (window.QUESTIONS.TOXIC_BASE || window.QUESTIONS.BASE) : window.QUESTIONS.BASE;
-  }
-  function pickAccuracyQuestions(){
-    return toxicMode ? (window.QUESTIONS.TOXIC_ACCURACY || window.QUESTIONS.ACCURACY) : window.QUESTIONS.ACCURACY;
-  }
-
   startBtn.onclick = () => {
     resetStats();
     stats.open_ts = stats.open_ts || new Date().toISOString();
@@ -397,7 +411,6 @@ ${best.meme}
 
     const base = pickBaseQuestions();
     baseLen = base.length;
-
     questions = [...base];
 
     show("quiz");
@@ -411,7 +424,6 @@ ${best.meme}
     const base = pickBaseQuestions();
     const acc = pickAccuracyQuestions();
     baseLen = base.length;
-
     questions = [...base, ...acc];
 
     show("quiz");
@@ -454,7 +466,6 @@ ${best.meme}
     }
     return h >>> 0;
   }
-
   function mulberry32(a){
     return function(){
       let t = a += 0x6D2B79F5;
@@ -463,21 +474,18 @@ ${best.meme}
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-
   function todayKey(){
     const d = new Date();
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const dd = String(d.getDate()).padStart(2,'0');
     return `${d.getFullYear()}-${mm}-${dd}`;
   }
-
   async function fetchGlobalStats(){
     const url = new URL(C.STATS_URL);
     url.searchParams.set("mode","stats");
     const res = await fetch(url.toString(), { method:"GET" });
     return await res.json();
   }
-
   function fillStatsTo100Smart(realTotal, realCounts){
     const ids = window.TYPES.map(t=>t.id);
     const K = ids.length;
@@ -504,7 +512,6 @@ ${best.meme}
         if (r <= cum) { counts[ids[i]] += 1; break; }
       }
     }
-
     return { total: 100, counts, demo:true, added: need };
   }
 
@@ -559,6 +566,7 @@ ${best.meme}
     statsMeta.textContent = "";
     statsBackBtn.style.display = "inline-block";
 
+    // описание по текущему режиму
     statsBody.innerHTML = `
       <div class="card" style="margin:0; background:#10121a">
         ${renderTypeDescriptionHTML(t)}
