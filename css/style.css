@@ -1,0 +1,81 @@
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:0; background:#0b0c10; color:#eaeaea}
+.wrap{max-width:720px; margin:0 auto; padding:16px}
+.card{background:#14161c; border:1px solid #222533; border-radius:16px; padding:16px; margin:12px 0}
+h1{font-size:22px; margin:0 0 6px}
+.muted{opacity:.78; font-size:13px; line-height:1.35}
+.q{font-size:18px; line-height:1.25; margin:0 0 12px}
+.btn{width:100%; text-align:left; border:1px solid #2a2f40; background:#10121a; color:#eaeaea;
+     border-radius:14px; padding:12px 12px; margin:8px 0; cursor:pointer; font-size:15px; line-height:1.25}
+.btn:hover{border-color:#3a415a}
+.row{display:flex; gap:10px; flex-wrap:wrap}
+.pill{background:#1b1f2b; border:1px solid #2a2f40; border-radius:999px; padding:6px 10px; font-size:12px; opacity:.9}
+.actions{display:flex; gap:10px; flex-wrap:wrap}
+.primary{background:#2b5cff; border-color:#2b5cff}
+.primary:hover{filter:brightness(1.05)}
+.small{font-size:13px}
+.divider{height:1px; background:#222533; margin:14px 0}
+.hint{font-size:12px; opacity:.75; line-height:1.3}
+
+/* brand */
+.brandRow{display:flex; gap:12px; align-items:center; margin-bottom:12px}
+.brandLogo{width:44px; height:44px; border-radius:12px; background:#0f1118; border:1px solid #2a2f40; object-fit:cover}
+.brandTitle{font-weight:800; font-size:14px}
+.brandSub{opacity:.75; font-size:12px}
+
+/* avatars */
+.avatarRow{display:flex; align-items:center; gap:12px}
+.avatar{
+  width:64px; height:64px; border-radius:999px;
+  border:1px solid #2a2f40;
+  background:#0f1118;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; flex:0 0 64px;
+  box-shadow:0 10px 25px rgba(0,0,0,.25);
+}
+.typeTag{font-size:12px; opacity:.82; margin-top:4px}
+
+/* toggle */
+.toggle{display:flex; align-items:center; gap:10px; margin-top:10px}
+.switch{position:relative; width:48px; height:28px; background:#1b1f2b; border:1px solid #2a2f40; border-radius:999px; cursor:pointer}
+.knob{position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:999px; background:#9aa4b2; transition:all .15s ease}
+.switch.on{background:#2b5cff; border-color:#2b5cff}
+.switch.on .knob{left:23px; background:white}
+.toggleLabel{font-size:13px; opacity:.92}
+
+/* ✅ Light quiz background */
+.quizCard{
+  background:#f5f7fb;
+  color:#0b0c10;
+  border-color:#d7deea;
+}
+.quizCard .pill{background:#eef2f8; border-color:#d7deea; color:#0b0c10}
+.quizCard .btn{background:#ffffff; color:#0b0c10; border-color:#d7deea}
+.quizCard .btn:hover{border-color:#98a7c2}
+
+/* ✅ Green result buttons */
+.resultActions .btn{
+  background:#0f1118;
+  border-color:#2a2f40;
+  color:#eaeaea;
+}
+.resultActions .btn.primary,
+.resultActions #shareBtn,
+.resultActions #ctaBtn,
+.resultActions #codimsBtn{
+  background:#16a34a;
+  border-color:#16a34a;
+  color:#ffffff;
+}
+.resultActions .btn.primary:hover,
+.resultActions #shareBtn:hover,
+.resultActions #ctaBtn:hover,
+.resultActions #codimsBtn:hover{
+  filter:brightness(1.05);
+}
+
+.supportLine{
+  margin-top:14px;
+  opacity:.8;
+  font-size:12px;
+  text-align:center;
+}
