@@ -6,7 +6,7 @@ window.APP_CONFIG = {
   CODIMS_URL: "https://codims.ru/",
 
   // ✅ Stats endpoint (working)
-  STATS_URL: "https://script.google.com/macros/s/AKfycbyKYHYE-05LcVAG-_bQFRwQgh6CkCA51IlfbTut5rH8BzluATdhtxd7-7pzAgislzqQ/exec",
+  STATS_URL: "https://script.google.com/macros/s/AKfycbz9yniacfk0HOEK45zVjfqxjnERxuhQUBhlNp9jZM2zjNFaVdY9C3oDAFJV4fdUvCBV/exec",
 
   // UTM base
   UTM: {
