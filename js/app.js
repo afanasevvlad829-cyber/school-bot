@@ -36,6 +36,15 @@
   const ctaBtn = document.getElementById("ctaBtn");
   const codimsBtn = document.getElementById("codimsBtn");
 
+  // stats modal refs
+  const statsBtn = document.getElementById("statsBtn");
+  const statsModal = document.getElementById("statsModal");
+  const statsCloseBg = document.getElementById("statsCloseBg");
+  const statsCloseBtn = document.getElementById("statsCloseBtn");
+  const statsRefreshBtn = document.getElementById("statsRefreshBtn");
+  const statsMeta = document.getElementById("statsMeta");
+  const statsBody = document.getElementById("statsBody");
+
   // ===== errors =====
   function logErr(msg){
     if (!errBox) return;
@@ -91,7 +100,7 @@
       toxic: false,
       accuracy: false,
       result: null,
-      answers: [],        // [{q_index, option, ts}]
+      answers: [],
       share_count: 0,
       meme_copy_count: 0,
       cta_aidacamp: 0,
@@ -111,7 +120,6 @@
         reason: reason || "unknown"
       };
 
-      // ✅ IMPORTANT: no headers to avoid preflight
       const res = await fetch(C.STATS_URL, {
         method: "POST",
         body: JSON.stringify({ mode: "session", payload }),
@@ -127,9 +135,7 @@
     }
   }
 
-  // If user closes early — try to flush once
   window.addEventListener("pagehide", () => {
-    // только если уже стартовал
     if (stats?.start_ts && !stats.finish_ts) {
       stats.notes.abandoned = true;
       sendSessionRow("pagehide");
@@ -171,7 +177,6 @@
 
   // ===== state =====
   let toxicMode = false;
-  let toxicInitialized = false;
   let usedAccuracy = false;
 
   let idx = 0;
@@ -187,7 +192,7 @@
     for (const [k,v] of Object.entries(map)) score[k] = (score[k]||0) + v;
   }
 
-  // ===== toxic toggle (log only on user click) =====
+  // ===== toxic toggle (no extra rows) =====
   function setToxic(on){
     toxicMode = !!on;
     stats.toxic = toxicMode;
@@ -203,18 +208,10 @@
       toxicLabel.textContent = "Режим токсик: OFF";
       toxicExplain.textContent = "OFF — мягко и по-доброму. ON — язвительно и “как в реальном чате”.";
     }
-
-    // не шлём “события” отдельно — всё уйдёт одной строкой в конце
-    // но отметку сохраним в stats
   }
 
-  toxicSwitch.addEventListener("click", () => {
-    if (!toxicInitialized) toxicInitialized = true;
-    setToxic(!toxicMode);
-  });
-
-  setToxic(false); // init without noise
-  toxicInitialized = true;
+  toxicSwitch.addEventListener("click", () => setToxic(!toxicMode));
+  setToxic(false);
 
   // ===== scoring =====
   function top2Types(){
@@ -254,9 +251,7 @@ ${best.meme}
       b.className = "btn";
       b.textContent = opt.t;
       b.onclick = () => {
-        // save answer to 1-row stats
         stats.answers.push({ q_index: idx, option: opt.t, ts: Date.now() });
-
         addScore(opt.s);
         idx++;
 
@@ -329,8 +324,6 @@ ${best.meme}
     `;
 
     show("result");
-
-    // ✅ отправляем одну строку по завершению
     sendSessionRow("finish");
   }
 
@@ -355,7 +348,6 @@ ${best.meme}
 
   // ===== buttons =====
   startBtn.onclick = () => {
-    // reset quiz stats
     resetStats();
     stats.open_ts = stats.open_ts || new Date().toISOString();
     stats.start_ts = new Date().toISOString();
@@ -388,7 +380,6 @@ ${best.meme}
   shareBtn.onclick = () => {
     stats.share_count += 1;
     doCopy(false);
-    // не шлём отдельной строкой, но можно “додать” отправкой обновления:
     sendSessionRow("share");
   };
 
@@ -401,7 +392,6 @@ ${best.meme}
   restartBtn.onclick = () => {
     stats.restart_count += 1;
     show("start");
-    // не сбрасываем sessionId, чтобы видеть ретрай как часть сессии
     sendSessionRow("restart");
   };
 
@@ -421,6 +411,134 @@ ${best.meme}
     sendSessionRow("cta_aidacamp");
   };
 
+  // ===== Global stats (smart fill to 100) =====
+  function openStatsModal(){ statsModal.style.display = "block"; }
+  function closeStatsModal(){ statsModal.style.display = "none"; }
+
+  function hashStrToSeed(str){
+    let h = 2166136261;
+    for (let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  // deterministic rng
+  function mulberry32(a){
+    return function(){
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function todayKey(){
+    const d = new Date();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
+  async function fetchGlobalStats(){
+    const url = new URL(C.STATS_URL);
+    url.searchParams.set("mode","stats");
+    const res = await fetch(url.toString(), { method:"GET" });
+    return await res.json();
+  }
+
+  // smart: keep real, add synthetic until 100 (stable per day)
+  function fillStatsTo100Smart(realTotal, realCounts){
+    const ids = window.TYPES.map(t=>t.id);
+    const K = ids.length;
+
+    const total = Math.max(0, Number(realTotal||0));
+    const counts = {};
+    ids.forEach(id => counts[id] = Number(realCounts?.[id] || 0));
+
+    if (total >= 100) return { total, counts, demo:false, added:0 };
+
+    const target = 100;
+    const need = target - total;
+
+    // smoothing: alpha ~ 1.5 (можно менять)
+    const alpha = 1.5;
+
+    // probabilities
+    const denom = total + alpha * K;
+    const p = ids.map(id => (counts[id] + alpha) / denom);
+
+    // stable rng per day + sheet total (чтобы при росте немного менялось)
+    const seedStr = `${todayKey()}|${total}|${C.BOT_USERNAME}`;
+    const rng = mulberry32(hashStrToSeed(seedStr));
+
+    // multinomial sampling: need draws
+    for (let n=0;n<need;n++){
+      const r = rng();
+      let cum = 0;
+      for (let i=0;i<ids.length;i++){
+        cum += p[i];
+        if (r <= cum) { counts[ids[i]] += 1; break; }
+      }
+    }
+
+    return { total: target, counts, demo:true, added: need };
+  }
+
+  function renderGlobalStats(view){
+    const ids = window.TYPES.map(t=>t.id);
+
+    const demoBadge = view.demo ? `<span class="badgeDemo">Демо (добавили +${view.added} до 100)</span>` : "";
+    statsMeta.innerHTML = `Всего прошли: <b>${view.demo ? (view.total - view.added) : view.total}</b>${demoBadge}`;
+
+    const rows = window.TYPES.map(t => {
+      const n = Number(view.counts?.[t.id] || 0);
+      const pct = view.total ? Math.round((n/view.total)*100) : 0;
+      return { t, n, pct };
+    }).sort((a,b)=> b.n - a.n);
+
+    statsBody.innerHTML = rows.map(({t,n,pct}) => `
+      <div class="statLine">
+        <div class="statLeft">
+          <div class="avatar" style="width:44px;height:44px;flex:0 0 44px">${window.TYPE_SVG[t.id] || ""}</div>
+          <div style="min-width:0">
+            <div class="statName">${t.emoji} ${t.name}</div>
+            <div class="statCount">n=${n}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="statPct">${pct}%</div>
+          <div class="statCount">от общего</div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function showGlobalStats(){
+    openStatsModal();
+    statsMeta.textContent = "Загружаю…";
+    statsBody.innerHTML = "";
+
+    try{
+      const json = await fetchGlobalStats();
+      if (!json || !json.ok) throw new Error("bad stats response");
+
+      const view = fillStatsTo100Smart(json.total || 0, json.counts || {});
+      renderGlobalStats(view);
+    }catch(e){
+      // если API недоступно — показываем “добавление до 100” от нулевых
+      const view = fillStatsTo100Smart(0, {});
+      statsMeta.innerHTML = `Всего прошли: <b>0</b><span class="badgeDemo">Демо (API недоступно)</span>`;
+      renderGlobalStats(view);
+    }
+  }
+
+  statsBtn.onclick = () => showGlobalStats();
+  statsCloseBg.onclick = () => closeStatsModal();
+  statsCloseBtn.onclick = () => closeStatsModal();
+  statsRefreshBtn.onclick = () => showGlobalStats();
+
   // ===== init hints =====
   const u = getTgUser();
   userHint.textContent = u.username
@@ -429,6 +547,5 @@ ${best.meme}
 
   webappHint.textContent = (tg ? `WebApp detected: ✅ (${tg.platform || "unknown"})` : `WebApp detected: ❌`);
 
-  // open timestamp
   trackOpenWhenReady();
 })();
