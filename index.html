@@ -63,6 +63,10 @@
         OFF — мягко и по-доброму. ON — язвительно и “как в реальном чате” (но без жести).
       </div>
 
+      <div class="hint" style="margin-top:8px">
+        Статистика: сохраняем только <b>user_id</b> и <b>@username</b> (если есть) + события (старт/финиш/шэр).
+      </div>
+
       <div style="height:12px"></div>
       <button class="btn primary" id="startBtn" onclick="startTest()">🚀 Начать тест</button>
 
@@ -93,7 +97,7 @@
         <ul style="margin:8px 0 0; padding-left:18px; line-height:1.4">
           <li>реже будет “на грани с другим типом”</li>
           <li>лучше ловит “престижника / социализатора / инфантилизированного”</li>
-          <li>результат получается более “узнаваемый” для пересылки</li>
+          <li>результат более “узнаваемый” для пересылки</li>
         </ul>
       </div>
       <div style="height:12px"></div>
@@ -143,6 +147,9 @@
   const CTA_URL = "https://aidacamp.ru/";     // АйДаКемп
   const APP_DEEPLINK = () => `https://t.me/${BOT_USERNAME}?startapp=schoolchat`;
 
+  // ✅ ВСТАВЛЕНО: Apps Script WebApp URL
+  const STATS_URL = "https://script.google.com/macros/s/AKfycbwkLqZOB1VGZJklQPs4VASAkf-JU9kB5VABH76KRhMZT1KDrQVa2ieE3zsGsp3Z7Gm1/exec";
+
   // ===== refs =====
   const screens = {
     start: document.getElementById("screen-start"),
@@ -182,6 +189,46 @@
   window.onerror = (msg) => logErr("JS error: " + msg);
   window.onunhandledrejection = (e) => logErr("Promise error: " + (e.reason?.message || e.reason || "unknown"));
 
+  // ===== user payload (tg login) =====
+  function getTgUser() {
+    const u = tg?.initDataUnsafe?.user || {};
+    return {
+      user_id: u.id || null,
+      username: u.username ? `@${u.username}` : null,
+      first_name: u.first_name || null,
+      last_name: u.last_name || null,
+      platform: tg?.platform || null,
+      chat_type: tg?.initDataUnsafe?.chat_type || null,
+    };
+  }
+
+  // ===== stats tracking =====
+  let currentResultId = null;
+
+  async function track(event, extra = {}) {
+    try {
+      const u = getTgUser();
+      const payload = {
+        event,
+        bot: BOT_USERNAME,
+        ...u,
+        toxic: toxicMode,
+        accuracy: usedAccuracy,
+        result: currentResultId,
+        question_count: questions.length,
+        extra
+      };
+      await fetch(STATS_URL, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload),
+        keepalive: true
+      });
+    } catch (e) {
+      // тихо
+    }
+  }
+
   // ===== toxic toggle =====
   let toxicMode = false;
   function setToxic(on){
@@ -197,12 +244,12 @@
       toxicLabel.textContent = "Режим токсик: OFF";
       toxicExplain.textContent = "OFF — мягко и по-доброму. ON — язвительно и “как в реальном чате” (но без жести).";
     }
+    track("toxic_toggle", { on: toxicMode });
   }
   toxicSwitch.addEventListener("click", () => setToxic(!toxicMode));
   setToxic(false);
 
   // ===== Types (12) =====
-  // Для “расширенного описания” используем шаблон: мягко/токсик.
   const TYPES = [
     mkType("investor","Родитель-Инвестор","📈","INV","«Образование = капитализация ребёнка»",
       "Ты покупаешь траекторию, среду и результат.",
@@ -359,7 +406,7 @@
     };
   }
 
-  // ===== SVG avatars (coin style) =====
+  // ===== SVG avatars =====
   const TYPE_SVG = Object.fromEntries(
     TYPES.map(t => [t.id, svgCoin(t.label, t.emoji, pickAccent(t.id).accent, pickAccent(t.id).deep)])
   );
@@ -418,7 +465,6 @@
   }
 
   // ===== Questions =====
-  // База: 5 вопросов (35 сек). Точность: +2 вопроса.
   const BASE_QUESTIONS = [
     {
       q: "«Скидываемся на шторы. 1500 до 18:00»",
@@ -427,7 +473,7 @@
         { t:"Где смета/КП/чеки? Почему 1500? 🕵️", s:{ skeptic:2, econom:1 } },
         { t:"Найду лучше: блэкаут, отзывы, доставка. 📋", s:{ planner:2, investor:1 } },
         { t:"Главное: безопасно/аллергии/регламенты. 🛡️", s:{ insurer:2 } },
-        { t:"Дорого. Давайте 3 альтернативы и промо. 🧮", s:{ econom:2 } },
+        { t:"Дорого. Дайте 3 альтернативы и промо. 🧮", s:{ econom:2 } },
       ]
     },
     {
@@ -445,9 +491,9 @@
       a: [
         { t:"Забирайте телефон. И зарядку тоже. 🛡️", s:{ insurer:2 } },
         { t:"Дайте факты: когда, сколько, динамика за месяц. 🕵️", s:{ skeptic:2, planner:1 } },
-        { t:"Ссылку на решение: выбрал(а) → оплатил(а) → всё. ⚡", s:{ overloaded:2 } },
+        { t:"Ссылку на решение: выбрал(а) → оплатил(а). ⚡", s:{ overloaded:2 } },
         { t:"Это про траекторию и среду. Нужен проект. 📈", s:{ investor:2 } },
-        { t:"Я компенсирую: куплю лучшее, чего не было у меня. ❤️", s:{ compensator:2 } },
+        { t:"Компенсирую: пусть будет лучше, чем у меня. ❤️", s:{ compensator:2 } },
       ]
     },
     {
@@ -480,36 +526,26 @@
         { t:"Сделаем статусно: чтобы не стыдно перед людьми. 💎", s:{ prestige:2 } },
         { t:"Я всё оформлю: бюджет, голосование, протокол. 📋", s:{ planner:2 } },
         { t:"А это вообще ок юридически? Без скандалов? 🕵️", s:{ skeptic:2 } },
-        { t:"Мне бы просто тишины. Дайте итог и номер карты. 🧘", s:{ leave_me:2 } },
+        { t:"Мне бы тишины. Дайте итог и номер карты. 🧘", s:{ leave_me:2 } },
       ]
     },
     {
       q: "Кто-то пишет: «А что нам лучше выбрать?»",
       a: [
-        { t:"Сейчас подберу “пакет”. 2 варианта и критерий. 📋", s:{ planner:2 } },
-        { t:"А вы сами скажите, что лучше. Я боюсь ошибиться. 🫠", s:{ infantilized:2 } },
-        { t:"Смотря по траектории: цель → навыки → среда → план. 📈", s:{ investor:2 } },
+        { t:"Подберу “пакет”: 2 варианта и критерий. 📋", s:{ planner:2 } },
+        { t:"Скажите сами, что лучше. Я боюсь ошибиться. 🫠", s:{ infantilized:2 } },
+        { t:"Цель → навыки → среда → план. И поехали. 📈", s:{ investor:2 } },
         { t:"Сначала докажите, что это не ерунда. Документы? 🕵️", s:{ skeptic:2 } },
-        { t:"У меня этого не было. Пусть у него будет лучшее. ❤️", s:{ compensator:2 } },
+        { t:"Пусть будет лучшее. У меня этого не было. ❤️", s:{ compensator:2 } },
       ]
     },
   ];
 
   // ===== State =====
   let idx = 0;
-  let score = {}; // typeId -> points
-  let questions = []; // active flow
+  let score = {};
+  let questions = [];
   let usedAccuracy = false;
-
-  function getUserLabel() {
-    try {
-      const u = tg?.initDataUnsafe?.user;
-      if (!u) return "";
-      const name = [u.first_name, u.last_name].filter(Boolean).join(" ");
-      const uname = u.username ? `@${u.username}` : "";
-      return `Ты в Telegram как: ${name} ${uname}`.trim();
-    } catch { return ""; }
-  }
 
   function show(screen) {
     Object.values(screens).forEach(s => s.style.display = "none");
@@ -533,11 +569,12 @@
       b.className = "btn";
       b.textContent = opt.t;
       b.onclick = () => {
+        track("answer", { q_index: idx, option: opt.t });
         addScore(opt.s);
         idx++;
 
-        // если дошли до конца базовых 5 и точность ещё не выбрана — показываем экран точности
         if (!usedAccuracy && idx === BASE_QUESTIONS.length) {
+          track("accuracy_offer");
           show("accuracy");
           return;
         }
@@ -559,7 +596,6 @@
   function buildResultText(best, second, delta, short=false) {
     const add = (delta <= 1 && second) ? ` (и чуть-чуть ${second.name})` : "";
     if (short) {
-      // 1-liner meme
       return `Я — ${best.emoji} ${best.name}${add}. ${best.meme} 😈  @${BOT_USERNAME}`;
     }
     return `Я прошёл(ла) тест «Какой ты родитель в школьном чате?» 😈
@@ -575,11 +611,15 @@ ${best.meme}
     const second = TYPES.find(x=>x.id===t2[0]) || null;
     const delta = (t1[1] - (t2?.[1] ?? 0));
 
+    currentResultId = best.id;
+
     const mode = toxicMode ? "toxic" : "soft";
     const d = best[mode];
 
     rTitle.textContent = `Ты — ${best.name}`;
-    rSubtitle.textContent = (toxicMode ? `Режим токсик: ON • ${best.meme}` : best.meme) + (usedAccuracy ? " • точность включена" : "");
+    rSubtitle.textContent =
+      (toxicMode ? `Режим токсик: ON • ${best.meme}` : best.meme) +
+      (usedAccuracy ? " • точность включена" : "");
 
     const bullets = d.bullets.map(x => `<li style="margin:6px 0">${x}</li>`).join("");
 
@@ -620,10 +660,12 @@ ${best.meme}
 
       <div class="divider"></div>
       <div class="muted small">📸 Скринь и кидай в чат. Это легально.</div>
-      <div class="muted small">🎯 Хочешь “готовое решение” для ребёнка — жми АйДаКемп.</div>
+      <div class="muted small">🎯 Хочешь “готовое решение” — жми АйДаКемп.</div>
     `;
 
     show("result");
+
+    track("finish", { best: best.id, second: second?.id || null, delta, score });
 
     try {
       if (tg?.MainButton) {
@@ -634,10 +676,6 @@ ${best.meme}
     } catch (e) {}
   }
 
-  async function copyToClipboard(text) {
-    await navigator.clipboard.writeText(text);
-  }
-
   async function doShare(short=false) {
     const { t1, t2 } = top2Types();
     const best = TYPES.find(x=>x.id===t1[0]) || TYPES[0];
@@ -645,8 +683,10 @@ ${best.meme}
     const delta = (t1[1] - (t2?.[1] ?? 0));
     const text = buildResultText(best, second, delta, short);
 
+    track(short ? "meme_copy" : "share", { short });
+
     try {
-      await copyToClipboard(text);
+      await navigator.clipboard.writeText(text);
       tg?.showPopup?.({
         title:"Скопировано",
         message: short ? "Короткий мем в буфере. Вставь в чат 😈" : "Текст результата в буфере. Вставь в чат 😄",
@@ -660,16 +700,15 @@ ${best.meme}
   // ===== Accuracy actions =====
   accuracyBtn.onclick = () => {
     usedAccuracy = true;
-    // расширяем поток: база + 2 вопроса
     questions = [...BASE_QUESTIONS, ...ACCURACY_QUESTIONS];
-    // idx сейчас уже на конце базовых (5), продолжаем с 6-го
+    track("accuracy_on");
     show("quiz");
     renderQuestion();
   };
 
   skipAccuracyBtn.onclick = () => {
     usedAccuracy = false;
-    // поток остаётся базовым, idx сейчас = 5, значит “конец” — показываем результат
+    track("accuracy_skip");
     renderResult();
   };
 
@@ -678,18 +717,25 @@ ${best.meme}
     score = {};
     idx = 0;
     usedAccuracy = false;
+    currentResultId = null;
     questions = [...BASE_QUESTIONS];
     if (errBox) errBox.textContent = "";
     show("quiz");
+    track("start");
     renderQuestion();
   };
 
   // Buttons
   shareBtn.onclick = () => doShare(false);
   memeBtn.onclick = () => doShare(true);
-  restartBtn.onclick = () => show("start");
+
+  restartBtn.onclick = () => {
+    track("restart");
+    show("start");
+  };
 
   ctaBtn.onclick = () => {
+    track("cta_click");
     try {
       if (tg?.openLink) tg.openLink(CTA_URL);
       else window.location.href = CTA_URL;
@@ -699,7 +745,12 @@ ${best.meme}
   };
 
   // init
-  userHint.textContent = getUserLabel();
+  const u = getTgUser();
+  userHint.textContent = u.username ? `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""} (${u.username})`.trim()
+                                   : `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""}`.trim();
+
+  // Track open once
+  track("open");
 </script>
 </body>
 </html>
