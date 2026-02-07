@@ -1,16 +1,10 @@
-export default async function handler(req, res) {
-  // Telegram шлёт только POST
+module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(200).send("ok");
 
   const BOT_TOKEN = process.env.BOT_TOKEN;
-
-  // Твой домен проекта
   const BASE_URL = "https://school-bot-one.vercel.app";
 
-  // Mini App в корне (index.html)
   const MINI_APP_URL = `${BASE_URL}/`;
-
-  // Картинка в корне проекта: /assets/start.jpg
   const START_IMAGE_URL = `${BASE_URL}/assets/start.jpg`;
 
   try {
@@ -36,7 +30,6 @@ export default async function handler(req, res) {
         ]
       };
 
-      // 1) Пытаемся отправить фото
       const r1 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,15 +41,13 @@ export default async function handler(req, res) {
         })
       });
 
-      // 2) Если фото не прошло — fallback на текст
       if (!r1.ok) {
-        const errText = await r1.text().catch(() => "");
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: caption + (errText ? `\n\n(Фото не отправилось)` : ""),
+            text: caption,
             reply_markup
           })
         });
@@ -67,4 +58,4 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(200).json({ ok: true, err: String(e?.message || e) });
   }
-}
+};
