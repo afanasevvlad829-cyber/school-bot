@@ -52,7 +52,7 @@
     if (!errBox) return;
     errBox.textContent += (errBox.textContent ? "\n" : "") + msg;
   }
-  window.onerror = (m) => logErr("JS error: " + m);
+  window.onerror = (m, src, line, col) => logErr(`JS error: ${m} @${line}:${col}`);
   window.onunhandledrejection = (e) => logErr("Promise error: " + (e.reason?.message || e.reason || "unknown"));
 
   // ===== telegram init =====
@@ -190,11 +190,15 @@
     screens[screen].style.display = "block";
   }
 
+  // ✅ FIX: safe scoring (если opt.s отсутствует)
   function addScore(map){
-    for (const [k,v] of Object.entries(map)) score[k] = (score[k]||0) + v;
+    map = map || {};
+    for (const [k,v] of Object.entries(map)) {
+      score[k] = (score[k] || 0) + (Number(v) || 0);
+    }
   }
 
-  // ===== toxic toggle (жёстко, но без мата/ненависти) =====
+  // ===== toxic toggle =====
   function setToxic(on){
     toxicMode = !!on;
     stats.toxic = toxicMode;
@@ -203,19 +207,19 @@
       toxicSwitch.classList.add("on");
       toxicSwitch.setAttribute("aria-checked","true");
       toxicLabel.textContent = "Режим токсик: ON";
-      toxicExplain.textContent = "ON — жёстко и язвительно, как в реальном чате. OFF — по-доброму.";
+      toxicExplain.textContent = "ON — жёстко и язвительно, как в чате. OFF — мягко.";
     } else {
       toxicSwitch.classList.remove("on");
       toxicSwitch.setAttribute("aria-checked","false");
       toxicLabel.textContent = "Режим токсик: OFF";
-      toxicExplain.textContent = "OFF — мягко. ON — жёстко: сарказм, правда, без сюсюканья.";
+      toxicExplain.textContent = "OFF — мягко. ON — жёстко: сарказм и правда без сюсюканья.";
     }
   }
 
   toxicSwitch.addEventListener("click", () => setToxic(!toxicMode));
   setToxic(false);
 
-  // ===== scoring =====
+  // ===== scoring helpers =====
   function top2Types(){
     const entries = window.TYPES.map(t => [t.id, score[t.id] || 0]);
     entries.sort((a,b)=>b[1]-a[1]);
@@ -241,7 +245,7 @@ ${best.meme}
 
   function renderTypeDescriptionHTML(typeObj){
     const d = toxicMode ? typeObj.toxic : typeObj.soft;
-    const bullets = d.bullets.map(x => `<li style="margin:6px 0">${x}</li>`).join("");
+    const bullets = (d.bullets || []).map(x => `<li style="margin:6px 0">${x}</li>`).join("");
     const refs = (typeObj.refs || []).map(r => `<li style="margin:6px 0">${r}</li>`).join("");
 
     return `
@@ -275,70 +279,101 @@ ${best.meme}
     `;
   }
 
+  // ===== quiz render =====
   function renderQuestion(){
-    const q = questions[idx];
-    const total = questions.length;
+    try {
+      const q = questions[idx];
+      const total = questions.length;
 
-    progressPill.textContent = `Вопрос ${idx+1}/${total}`;
-    microPill.textContent = `ещё ${Math.max(0,total-(idx+1))} клика до диагноза`;
-    qText.textContent = q.q;
+      if (!q) {
+        logErr(`renderQuestion: нет вопроса idx=${idx}, total=${total}`);
+        // запасной выход
+        renderResult();
+        return;
+      }
 
-    answersEl.innerHTML = "";
-    q.a.forEach(opt => {
-      const b = document.createElement("button");
-      b.className = "btn";
-      b.textContent = opt.t;
-      b.onclick = () => {
-        stats.answers.push({ q_index: idx, option: opt.t, ts: Date.now() });
-        addScore(opt.s);
-        idx++;
+      progressPill.textContent = `Вопрос ${idx+1}/${total}`;
+      microPill.textContent = `ещё ${Math.max(0,total-(idx+1))} клика до диагноза`;
+      qText.textContent = q.q || "(пустой вопрос)";
 
-        if (!usedAccuracy && idx === window.QUESTIONS.BASE.length) {
-          show("accuracy");
-          return;
-        }
+      answersEl.innerHTML = "";
 
-        if (idx < total) renderQuestion();
-        else renderResult();
-      };
-      answersEl.appendChild(b);
-    });
+      const answers = Array.isArray(q.a) ? q.a : [];
+      if (answers.length === 0) {
+        logErr(`renderQuestion: у вопроса idx=${idx} нет вариантов ответов`);
+      }
+
+      answers.forEach((opt, optIndex) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = opt?.t || `(вариант ${optIndex+1})`;
+
+        // ✅ FIX: try/catch на клике, чтобы не “молчало”
+        b.onclick = () => {
+          try {
+            stats.answers.push({ q_index: idx, option: opt?.t || "", ts: Date.now() });
+
+            // ✅ FIX: opt.s может быть undefined
+            addScore(opt?.s || {});
+
+            idx++;
+
+            if (!usedAccuracy && idx === window.QUESTIONS.BASE.length) {
+              show("accuracy");
+              return;
+            }
+
+            if (idx < total) renderQuestion();
+            else renderResult();
+          } catch (e) {
+            logErr("CLICK ERROR: " + (e?.message || String(e)));
+          }
+        };
+
+        answersEl.appendChild(b);
+      });
+    } catch (e) {
+      logErr("renderQuestion ERROR: " + (e?.message || String(e)));
+    }
   }
 
   function renderResult(){
-    const { t1, t2 } = top2Types();
-    const best = window.TYPES.find(x=>x.id===t1[0]) || window.TYPES[0];
-    const second = window.TYPES.find(x=>x.id===t2[0]) || null;
-    const delta = (t1[1] - (t2?.[1] ?? 0));
+    try{
+      const { t1, t2 } = top2Types();
+      const best = window.TYPES.find(x=>x.id===t1[0]) || window.TYPES[0];
+      const second = window.TYPES.find(x=>x.id===t2[0]) || null;
+      const delta = (t1[1] - (t2?.[1] ?? 0));
 
-    stats.result = best.id;
-    stats.finish_ts = new Date().toISOString();
+      stats.result = best.id;
+      stats.finish_ts = new Date().toISOString();
 
-    rTitle.textContent = `Ты — ${best.name}`;
-    rSubtitle.textContent = (toxicMode ? `Режим токсик: ON • ${best.meme}` : best.meme) + (usedAccuracy ? " • точность включена" : "");
+      rTitle.textContent = `Ты — ${best.name}`;
+      rSubtitle.textContent = (toxicMode ? `Режим токсик: ON • ${best.meme}` : best.meme) + (usedAccuracy ? " • точность включена" : "");
 
-    const html = renderTypeDescriptionHTML(best);
+      const html = renderTypeDescriptionHTML(best);
 
-    // "на грани" вставим снизу
-    const secondBlock = (delta <= 1 && second) ? `
-      <div class="divider"></div>
-      <div class="muted small">Ты на грани с:</div>
-      <div class="avatarRow" style="margin-top:8px">
-        ${renderAvatar(second.id)}
-        <div>
-          <div style="font-size:14px; font-weight:900">${second.name}</div>
-          <div class="typeTag">${second.meme}</div>
+      const secondBlock = (delta <= 1 && second) ? `
+        <div class="divider"></div>
+        <div class="muted small">Ты на грани с:</div>
+        <div class="avatarRow" style="margin-top:8px">
+          ${renderAvatar(second.id)}
+          <div>
+            <div style="font-size:14px; font-weight:900">${second.name}</div>
+            <div class="typeTag">${second.meme}</div>
+          </div>
         </div>
-      </div>
-    ` : "";
+      ` : "";
 
-    rBody.innerHTML = html + secondBlock + `
-      <div class="divider"></div>
-      <div class="muted small">📸 Скринь и кидай в чат. Это легально.</div>
-    `;
+      rBody.innerHTML = html + secondBlock + `
+        <div class="divider"></div>
+        <div class="muted small">📸 Скринь и кидай в чат. Это легально.</div>
+      `;
 
-    show("result");
-    sendSessionRow("finish");
+      show("result");
+      sendSessionRow("finish");
+    } catch(e){
+      logErr("renderResult ERROR: " + (e?.message || String(e)));
+    }
   }
 
   async function doCopy(short=false){
@@ -425,7 +460,7 @@ ${best.meme}
     sendSessionRow("cta_aidacamp");
   };
 
-  // ===== Global stats (smart fill to 100, NO meta text, clickable rows) =====
+  // ===== Global stats =====
   function openStatsModal(){ statsModal.style.display = "block"; }
   function closeStatsModal(){ statsModal.style.display = "none"; }
 
@@ -472,7 +507,7 @@ ${best.meme}
     if (total >= 100) return { total, counts, demo:false, added:0 };
 
     const need = 100 - total;
-    const alpha = 1.5; // smoothing
+    const alpha = 1.5;
     const denom = total + alpha * K;
     const p = ids.map(id => (counts[id] + alpha) / denom);
 
@@ -491,13 +526,13 @@ ${best.meme}
     return { total: 100, counts, demo:true, added: need };
   }
 
-  let lastStatsView = null; // for back button
+  let lastStatsView = null;
 
   function renderGlobalStatsList(view){
     lastStatsView = view;
 
     statsTitle.textContent = "📊 Общая статистика";
-    statsMeta.textContent = ""; // ✅ скрываем “Всего прошли / демо / n=..”
+    statsMeta.textContent = ""; // скрыто
     statsBackBtn.style.display = "none";
 
     const myType = stats.result;
@@ -526,7 +561,6 @@ ${best.meme}
       `;
     }).join("");
 
-    // click -> open description
     [...statsBody.querySelectorAll(".statLine")].forEach(el => {
       el.addEventListener("click", () => {
         const id = el.getAttribute("data-type");
@@ -540,7 +574,7 @@ ${best.meme}
     if (!t) return;
 
     statsTitle.textContent = `${t.emoji} ${t.name}`;
-    statsMeta.textContent = ""; // скрываем
+    statsMeta.textContent = "";
     statsBackBtn.style.display = "inline-block";
 
     statsBody.innerHTML = `
@@ -563,7 +597,6 @@ ${best.meme}
       const view = fillStatsTo100Smart(json.total || 0, json.counts || {});
       renderGlobalStatsList(view);
     }catch(e){
-      // fallback: “умное” заполнение от нулей
       const view = fillStatsTo100Smart(0, {});
       renderGlobalStatsList(view);
     }
