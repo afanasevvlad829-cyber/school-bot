@@ -30,7 +30,7 @@
         <div class="pill">5 вопросов</div>
       </div>
       <div class="hint" id="toxicExplain" style="margin-top:8px">
-        OFF — мягко и по-доброму. ON — язвительно и “как в реальном чате” (но без жести).
+        OFF — мягко. ON — жёстко, как в чате (без цензуры… почти).
       </div>
 
       <div class="hint" style="margin-top:8px" id="webappHint"></div>
@@ -77,14 +77,12 @@
     </div>
 
     <!-- RESULT -->
-    <div class="card" id="screen-result" style="display:none">
+    <div class="card quizCard resultLight" id="screen-result" style="display:none">
       <h1 id="rTitle">Ты — ...</h1>
       <div class="muted" id="rSubtitle"></div>
 
       <div style="height:12px"></div>
-      <div class="card" style="margin:0; background:#10121a" id="rBody"></div>
-
-      <div class="supportLine">При поддержке сети ИТ-школ</div>
+      <div class="card resultInner" id="rBody"></div>
 
       <div style="height:12px"></div>
       <div class="actions resultActions">
@@ -92,6 +90,13 @@
         <button class="btn" id="memeBtn">🧾 Скопировать короткий мем</button>
         <button class="btn" id="restartBtn">🔁 Пройти заново</button>
         <button class="btn" id="statsBtn">📊 Общая статистика</button>
+
+        <!-- Support line ABOVE codims -->
+        <div class="supportRow">
+          <img class="supportLogo" src="assets/logo.png" alt="logo" />
+          <div class="supportText">При поддержке сети ИТ-школ</div>
+        </div>
+
         <button class="btn" id="codimsBtn">🧠 АйДаКодить</button>
         <button class="btn" id="ctaBtn">🏕️ АйДаКемп</button>
       </div>
@@ -109,7 +114,7 @@
     <div class="modalCard">
       <div class="modalHeader">
         <div>
-          <div class="modalTitle">📊 Общая статистика</div>
+          <div class="modalTitle" id="statsTitle">📊 Общая статистика</div>
           <div class="modalSub" id="statsMeta"></div>
         </div>
         <button class="modalX" id="statsCloseBtn">✕</button>
@@ -118,6 +123,7 @@
       <div class="modalBody" id="statsBody"></div>
 
       <div class="modalFooter">
+        <button class="btn" id="statsBackBtn" style="display:none">← Назад к статистике</button>
         <button class="btn" id="statsRefreshBtn">🔄 Обновить</button>
       </div>
     </div>
