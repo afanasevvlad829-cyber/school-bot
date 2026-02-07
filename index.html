@@ -24,13 +24,19 @@
       <h1>Какой ты родитель в школьном чате?</h1>
       <div class="muted">Тест на 35 секунд. Узнаешь себя — и сразу пересылаешь в чат 😈</div>
 
-      <div class="toggle">
-        <div class="switch" id="toxicSwitch" role="switch" aria-checked="false"><div class="knob"></div></div>
-        <div class="toggleLabel" id="toxicLabel">Режим токсик: OFF</div>
+      <!-- 3-mode switch -->
+      <div class="modeWrap">
+        <div class="modeTitle">Режим:</div>
+        <div class="seg" id="modeSeg" role="tablist" aria-label="Режим">
+          <button class="segBtn isActive" id="modeMeme" role="tab" aria-selected="true">Мемно</button>
+          <button class="segBtn" id="modeToxic" role="tab" aria-selected="false">Токсично</button>
+          <button class="segBtn" id="modeEvil" role="tab" aria-selected="false">Злобно</button>
+        </div>
         <div class="pill">5 вопросов</div>
       </div>
-      <div class="hint" id="toxicExplain" style="margin-top:8px">
-        OFF — мягко. ON — жёстко, как в чате (без цензуры… почти).
+
+      <div class="hint" style="margin-top:8px" id="modeExplain">
+        Мемно — узнаваемо и смешно. Токсично — язвительно. Злобно — максимально жёстко (без мата).
       </div>
 
       <div class="hint" style="margin-top:8px" id="webappHint"></div>
@@ -91,7 +97,6 @@
         <button class="btn" id="restartBtn">🔁 Пройти заново</button>
         <button class="btn" id="statsBtn">📊 Общая статистика</button>
 
-        <!-- Support line ABOVE codims -->
         <div class="supportRow">
           <img class="supportLogo" src="assets/logo.png" alt="logo" />
           <div class="supportText">При поддержке сети ИТ-школ</div>
@@ -129,7 +134,6 @@
     </div>
   </div>
 
-  <!-- modules -->
   <script src="js/config.js"></script>
   <script src="js/questions.js"></script>
   <script src="js/types.js"></script>
