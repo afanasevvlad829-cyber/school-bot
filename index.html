@@ -91,6 +91,7 @@
         <button class="btn primary" id="shareBtn">📣 Переслать в школьный чат</button>
         <button class="btn" id="memeBtn">🧾 Скопировать короткий мем</button>
         <button class="btn" id="restartBtn">🔁 Пройти заново</button>
+        <button class="btn" id="statsBtn">📊 Общая статистика</button>
         <button class="btn" id="codimsBtn">🧠 АйДаКодить</button>
         <button class="btn" id="ctaBtn">🏕️ АйДаКемп</button>
       </div>
@@ -100,6 +101,26 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- STATS MODAL -->
+  <div class="modal" id="statsModal" style="display:none">
+    <div class="modalBackdrop" id="statsCloseBg"></div>
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div>
+          <div class="modalTitle">📊 Общая статистика</div>
+          <div class="modalSub" id="statsMeta"></div>
+        </div>
+        <button class="modalX" id="statsCloseBtn">✕</button>
+      </div>
+
+      <div class="modalBody" id="statsBody"></div>
+
+      <div class="modalFooter">
+        <button class="btn" id="statsRefreshBtn">🔄 Обновить</button>
+      </div>
+    </div>
   </div>
 
   <!-- modules -->
