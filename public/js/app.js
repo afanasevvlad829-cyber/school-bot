@@ -111,57 +111,25 @@
   resetStats();
 
   /**
-   * ✅ FIXED:
-   * - send FLAT payload (not nested {payload:{...}})
-   * - send as text/plain so GAS always gets postData.contents
-   * - add ts_iso + event/reason
+   * ✅ FIXED FOR YOUR CURRENT GAS doPost:
+   * GAS expects JSON body: { payload: {...} }
+   * so we send exactly that + Content-Type text/plain (stable for GAS).
    */
   async function sendSessionRow(reason){
     try{
       const tgUser = getTgUser();
+
+      // GAS читает payload.*
       const payload = {
-        ts_iso: new Date().toISOString(),
-        event: reason || "unknown",
-        reason: reason || "unknown",
-
-        // session
-        session_id: stats.session_id,
-        bot: stats.bot,
-
-        // timings
-        open_ts: stats.open_ts,
-        start_ts: stats.start_ts,
-        finish_ts: stats.finish_ts,
-
-        // mode/result
-        mode: stats.mode,
-        accuracy: stats.accuracy ? 1 : 0,
-        result: stats.result,
-
-        // counters
-        share_count: stats.share_count,
-        meme_copy_count: stats.meme_copy_count,
-        cta_aidacamp: stats.cta_aidacamp,
-        cta_codims: stats.cta_codims,
-        restart_count: stats.restart_count,
-
-        // tg user fields
-        user_id: tgUser.user_id,
-        username: tgUser.username,
-        first_name: tgUser.first_name,
-        last_name: tgUser.last_name,
-        platform: tgUser.platform,
-        chat_type: tgUser.chat_type,
-
-        // json fields for debugging/analytics
-        answers_json: stats.answers,
-        notes_json: stats.notes,
+        ...stats,
+        ...tgUser,
+        reason: reason || "unknown"
       };
 
       const res = await fetch(C.STATS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ payload }),
         keepalive: true
       });
 
@@ -460,9 +428,6 @@ ${best.meme}
 
     show("quiz");
     renderQuestion();
-
-    // опционально можно слать "start" (если хочешь только 1 строку — закомментируй)
-    // sendSessionRow("start");
   };
 
   accuracyBtn.onclick = () => {
