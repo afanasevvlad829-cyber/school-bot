@@ -110,13 +110,58 @@
 
   resetStats();
 
+  /**
+   * ✅ FIXED:
+   * - send FLAT payload (not nested {payload:{...}})
+   * - send as text/plain so GAS always gets postData.contents
+   * - add ts_iso + event/reason
+   */
   async function sendSessionRow(reason){
     try{
-      const payload = { ...stats, ...getTgUser(), reason: reason || "unknown" };
+      const tgUser = getTgUser();
+      const payload = {
+        ts_iso: new Date().toISOString(),
+        event: reason || "unknown",
+        reason: reason || "unknown",
+
+        // session
+        session_id: stats.session_id,
+        bot: stats.bot,
+
+        // timings
+        open_ts: stats.open_ts,
+        start_ts: stats.start_ts,
+        finish_ts: stats.finish_ts,
+
+        // mode/result
+        mode: stats.mode,
+        accuracy: stats.accuracy ? 1 : 0,
+        result: stats.result,
+
+        // counters
+        share_count: stats.share_count,
+        meme_copy_count: stats.meme_copy_count,
+        cta_aidacamp: stats.cta_aidacamp,
+        cta_codims: stats.cta_codims,
+        restart_count: stats.restart_count,
+
+        // tg user fields
+        user_id: tgUser.user_id,
+        username: tgUser.username,
+        first_name: tgUser.first_name,
+        last_name: tgUser.last_name,
+        platform: tgUser.platform,
+        chat_type: tgUser.chat_type,
+
+        // json fields for debugging/analytics
+        answers_json: stats.answers,
+        notes_json: stats.notes,
+      };
 
       const res = await fetch(C.STATS_URL, {
         method: "POST",
-        body: JSON.stringify({ mode: "session", payload }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
         keepalive: true
       });
 
@@ -157,11 +202,11 @@
 
   function withUtm(baseUrl, content){
     const u = new URL(baseUrl);
-    const utm = C.UTM;
-    u.searchParams.set("utm_source", utm.utm_source);
-    u.searchParams.set("utm_medium", utm.utm_medium);
-    u.searchParams.set("utm_campaign", utm.utm_campaign);
-    u.searchParams.set("utm_content", content);
+    const utm = C.UTM || {};
+    u.searchParams.set("utm_source", utm.utm_source || "tg_miniapp");
+    u.searchParams.set("utm_medium", utm.utm_medium || "schoolchat_test");
+    u.searchParams.set("utm_campaign", utm.utm_campaign || "cta");
+    u.searchParams.set("utm_content", content || "unknown");
     u.searchParams.set("bot", C.BOT_USERNAME);
     if (stats?.result) u.searchParams.set("type", stats.result);
     u.searchParams.set("sid", sessionId);
@@ -415,6 +460,9 @@ ${best.meme}
 
     show("quiz");
     renderQuestion();
+
+    // опционально можно слать "start" (если хочешь только 1 строку — закомментируй)
+    // sendSessionRow("start");
   };
 
   accuracyBtn.onclick = () => {
