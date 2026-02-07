@@ -64,8 +64,10 @@
       </div>
 
       <div class="hint" style="margin-top:8px">
-        Статистика: сохраняем только <b>user_id</b> и <b>@username</b> (если есть) + события (старт/финиш/шэр).
+        Статистика: сохраняем только <b>user_id</b> и <b>@username</b> (если есть) + события (open/start/finish/share/cta).
       </div>
+
+      <div class="hint" style="margin-top:8px" id="webappHint"></div>
 
       <div style="height:12px"></div>
       <button class="btn primary" id="startBtn" onclick="startTest()">🚀 Начать тест</button>
@@ -132,6 +134,7 @@
   </div>
 
 <script>
+  // ===== Telegram init =====
   const tg = window.Telegram?.WebApp;
   try {
     if (tg) {
@@ -142,12 +145,12 @@
     }
   } catch (e) {}
 
-  // ✅ Настройки
+  // ✅ Settings
   const BOT_USERNAME = "schoolchat1_bot";     // @schoolchat1_bot
   const CTA_URL = "https://aidacamp.ru/";     // АйДаКемп
   const APP_DEEPLINK = () => `https://t.me/${BOT_USERNAME}?startapp=schoolchat`;
 
-  // ✅ ВСТАВЛЕНО: Apps Script WebApp URL
+  // ✅ Stats URL (WORKING)
   const STATS_URL = "https://script.google.com/macros/s/AKfycbyKYHYE-05LcVAG-_bQFRwQgh6CkCA51IlfbTut5rH8BzluATdhtxd7-7pzAgislzqQ/exec";
 
   // ===== refs =====
@@ -163,6 +166,7 @@
   const progressPill = document.getElementById("progressPill");
   const microPill = document.getElementById("microPill");
   const userHint = document.getElementById("userHint");
+  const webappHint = document.getElementById("webappHint");
 
   const rTitle = document.getElementById("rTitle");
   const rSubtitle = document.getElementById("rSubtitle");
@@ -189,7 +193,13 @@
   window.onerror = (msg) => logErr("JS error: " + msg);
   window.onunhandledrejection = (e) => logErr("Promise error: " + (e.reason?.message || e.reason || "unknown"));
 
-  // ===== user payload (tg login) =====
+  // ===== WebApp diagnostics =====
+  function hasTgUser() {
+    const u = tg?.initDataUnsafe?.user;
+    return !!(u && u.id);
+  }
+
+  // ===== user payload =====
   function getTgUser() {
     const u = tg?.initDataUnsafe?.user || {};
     return {
@@ -197,13 +207,16 @@
       username: u.username ? `@${u.username}` : null,
       first_name: u.first_name || null,
       last_name: u.last_name || null,
-      platform: tg?.platform || null,
+      platform: tg?.platform || "unknown",
       chat_type: tg?.initDataUnsafe?.chat_type || null,
     };
   }
 
   // ===== stats tracking =====
   let currentResultId = null;
+  let toxicMode = false;
+  let usedAccuracy = false;
+  let questions = [];
 
   async function track(event, extra = {}) {
     try {
@@ -218,19 +231,44 @@
         question_count: questions.length,
         extra
       };
+
+      // ✅ IMPORTANT: no headers => no preflight => Apps Script receives POST reliably
       await fetch(STATS_URL, {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload),
         keepalive: true
       });
     } catch (e) {
-      // тихо
+      // optional: logErr("track failed: " + (e?.message || e));
     }
   }
 
+  function trackOpenWhenReady() {
+    const startedAt = Date.now();
+
+    const tick = () => {
+      if (hasTgUser()) {
+        track("open", { tg: true, waited_ms: Date.now() - startedAt });
+        return;
+      }
+      if (Date.now() - startedAt > 2000) {
+        track("open", {
+          tg: !!tg,
+          platform: tg?.platform || null,
+          has_initData: !!tg?.initData,
+          initData_len: tg?.initData ? tg.initData.length : 0,
+          initKeys: tg?.initDataUnsafe ? Object.keys(tg.initDataUnsafe) : [],
+          reason: "no_initDataUnsafe_user_after_2s"
+        });
+        return;
+      }
+      setTimeout(tick, 150);
+    };
+
+    tick();
+  }
+
   // ===== toxic toggle =====
-  let toxicMode = false;
   function setToxic(on){
     toxicMode = !!on;
     if (toxicMode) {
@@ -541,11 +579,9 @@
     },
   ];
 
-  // ===== State =====
+  // ===== quiz state =====
   let idx = 0;
   let score = {};
-  let questions = [];
-  let usedAccuracy = false;
 
   function show(screen) {
     Object.values(screens).forEach(s => s.style.display = "none");
@@ -664,7 +700,6 @@ ${best.meme}
     `;
 
     show("result");
-
     track("finish", { best: best.id, second: second?.id || null, delta, score });
 
     try {
@@ -719,9 +754,9 @@ ${best.meme}
     usedAccuracy = false;
     currentResultId = null;
     questions = [...BASE_QUESTIONS];
-    if (errBox) errBox.textContent = "";
+
     show("quiz");
-    track("start");
+    track("start", { tg_user_present: hasTgUser() });
     renderQuestion();
   };
 
@@ -744,13 +779,17 @@ ${best.meme}
     }
   };
 
-  // init
+  // ===== init UI hints =====
   const u = getTgUser();
-  userHint.textContent = u.username ? `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""} (${u.username})`.trim()
-                                   : `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""}`.trim();
+  userHint.textContent = u.username
+    ? `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""} (${u.username})`.trim()
+    : `Ты в Telegram как: ${u.first_name || ""} ${u.last_name || ""}`.trim();
 
-  // Track open once
-  track("open");
+  webappHint.textContent =
+    (tg ? `WebApp detected: ✅ (${tg.platform || "unknown"})` : `WebApp detected: ❌ (открыто не как Mini App)`);
+
+  // ✅ Track open when user is ready (or diagnose)
+  trackOpenWhenReady();
 </script>
 </body>
 </html>
