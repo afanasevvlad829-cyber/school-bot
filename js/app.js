@@ -172,6 +172,7 @@
   let idx = 0;
   let score = {};
   let questions = [];
+  let baseLen = 0; // ✅ база зависит от режима
 
   function show(screen){
     Object.values(screens).forEach(s => s.style.display = "none");
@@ -193,7 +194,7 @@
       toxicSwitch.classList.add("on");
       toxicSwitch.setAttribute("aria-checked","true");
       toxicLabel.textContent = "Режим токсик: ON";
-      toxicExplain.textContent = "ON — жёстко и язвительно, как в чате. OFF — мягко.";
+      toxicExplain.textContent = "ON — максимально жёстко и язвительно (без мата). OFF — мягко.";
     } else {
       toxicSwitch.classList.remove("on");
       toxicSwitch.setAttribute("aria-checked","false");
@@ -298,7 +299,8 @@ ${best.meme}
             addScore(opt?.s || {});
             idx++;
 
-            if (!usedAccuracy && idx === window.QUESTIONS.BASE.length) {
+            // ✅ показываем экран точности ровно после базовых 5 вопросов
+            if (!usedAccuracy && idx === baseLen) {
               show("accuracy");
               return;
             }
@@ -375,6 +377,14 @@ ${best.meme}
     }
   }
 
+  // ✅ выбираем набор вопросов на старте по токсик-режиму
+  function pickBaseQuestions(){
+    return toxicMode ? (window.QUESTIONS.TOXIC_BASE || window.QUESTIONS.BASE) : window.QUESTIONS.BASE;
+  }
+  function pickAccuracyQuestions(){
+    return toxicMode ? (window.QUESTIONS.TOXIC_ACCURACY || window.QUESTIONS.ACCURACY) : window.QUESTIONS.ACCURACY;
+  }
+
   startBtn.onclick = () => {
     resetStats();
     stats.open_ts = stats.open_ts || new Date().toISOString();
@@ -385,7 +395,10 @@ ${best.meme}
     usedAccuracy = false;
     stats.accuracy = false;
 
-    questions = [...window.QUESTIONS.BASE];
+    const base = pickBaseQuestions();
+    baseLen = base.length;
+
+    questions = [...base];
 
     show("quiz");
     renderQuestion();
@@ -394,7 +407,13 @@ ${best.meme}
   accuracyBtn.onclick = () => {
     usedAccuracy = true;
     stats.accuracy = true;
-    questions = [...window.QUESTIONS.BASE, ...window.QUESTIONS.ACCURACY];
+
+    const base = pickBaseQuestions();
+    const acc = pickAccuracyQuestions();
+    baseLen = base.length;
+
+    questions = [...base, ...acc];
+
     show("quiz");
     renderQuestion();
   };
@@ -405,41 +424,25 @@ ${best.meme}
     renderResult();
   };
 
-  shareBtn.onclick = () => {
-    stats.share_count += 1;
-    doCopy(false);
-    sendSessionRow("share");
-  };
-
-  memeBtn.onclick = () => {
-    stats.meme_copy_count += 1;
-    doCopy(true);
-    sendSessionRow("meme_copy");
-  };
-
-  restartBtn.onclick = () => {
-    stats.restart_count += 1;
-    show("start");
-    sendSessionRow("restart");
-  };
+  shareBtn.onclick = () => { stats.share_count += 1; doCopy(false); sendSessionRow("share"); };
+  memeBtn.onclick  = () => { stats.meme_copy_count += 1; doCopy(true); sendSessionRow("meme_copy"); };
+  restartBtn.onclick = () => { stats.restart_count += 1; show("start"); sendSessionRow("restart"); };
 
   codimsBtn.onclick = () => {
     stats.cta_codims += 1;
     const url = withUtm(C.CODIMS_URL, "cta_codims");
-    if (tg?.openLink) tg.openLink(url);
-    else window.location.href = url;
+    if (tg?.openLink) tg.openLink(url); else window.location.href = url;
     sendSessionRow("cta_codims");
   };
 
   ctaBtn.onclick = () => {
     stats.cta_aidacamp += 1;
     const url = withUtm(C.AIDACAMP_URL, "cta_aidacamp");
-    if (tg?.openLink) tg.openLink(url);
-    else window.location.href = url;
+    if (tg?.openLink) tg.openLink(url); else window.location.href = url;
     sendSessionRow("cta_aidacamp");
   };
 
-  // ===== Global stats (как у тебя было) =====
+  // ===== Global stats (как было) =====
   function openStatsModal(){ statsModal.style.display = "block"; }
   function closeStatsModal(){ statsModal.style.display = "none"; }
 
@@ -511,7 +514,7 @@ ${best.meme}
     lastStatsView = view;
 
     statsTitle.textContent = "📊 Общая статистика";
-    statsMeta.textContent = ""; // скрыто
+    statsMeta.textContent = "";
     statsBackBtn.style.display = "none";
 
     const myType = stats.result;
