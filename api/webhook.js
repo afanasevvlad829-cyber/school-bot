@@ -7,6 +7,9 @@ module.exports = async (req, res) => {
   const MINI_APP_URL = `${BASE_URL}/`;
   const START_IMAGE_URL = `${BASE_URL}/assets/start.jpg`;
 
+  const YT_URL = "https://youtu.be/yxRXC0_dq6Y";
+  const VK_URL = "https://vkvideo.ru/video-194976808_456239332";
+
   try {
     const update = req.body;
 
@@ -21,12 +24,22 @@ module.exports = async (req, res) => {
 `😈 Тест на 35 секунд: «Какой ты родитель в школьном чате?»
 Узнаешь себя — и сразу пересылаешь в чат.
 
-Режимы: Мемно / Токсично / Злобно`;
+Режимы: Мемно / Токсично / Злобно
+
+А мне только посмотреть:
+• <a href="${YT_URL}">YouTube</a>
+• <a href="${VK_URL}">ВК</a>
+
+Поддержка: @Progaschool`;
 
       const reply_markup = {
         inline_keyboard: [
           [{ text: "🚀 Начать тест", web_app: { url: MINI_APP_URL } }],
-          [{ text: "↗️ Открыть в браузере", url: MINI_APP_URL }]
+          [{ text: "↗️ Открыть в браузере", url: MINI_APP_URL }],
+          [
+            { text: "▶️ YouTube", url: YT_URL },
+            { text: "▶️ ВК", url: VK_URL }
+          ]
         ]
       };
 
@@ -37,6 +50,8 @@ module.exports = async (req, res) => {
           chat_id: chatId,
           photo: START_IMAGE_URL,
           caption,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
           reply_markup
         })
       });
@@ -48,6 +63,8 @@ module.exports = async (req, res) => {
           body: JSON.stringify({
             chat_id: chatId,
             text: caption,
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
             reply_markup
           })
         });
